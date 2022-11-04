@@ -1,0 +1,57 @@
+version: "3.8"
+services:
+  processor:
+    depends_on:
+      - rabbitmq
+      - postgresql
+    container_name: ${PROCESSOR_CONTAINER_NAME}
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: ./.env
+    ports:
+      - ${PROCESSOR_LOCAL_PORT}:${PROCESSOR_DOCKER_PORT}
+    image: bank-transaction-processor-img
+    stdin_open: true
+    tty: true # allocate virtual terminal session within the container
+    networks:
+      - bank-app-network
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: ${RABBITMQ_CONTAINER_NAME}
+    restart: unless-stopped
+    env_file: ./.env
+    ports:
+      - ${RABBITMQ_LOCAL_PORT1}:${RABBITMQ_LOCAL_DOCKER1}
+      - ${RABBITMQ_LOCAL_PORT2}:${RABBITMQ_LOCAL_DOCKER2}
+    volumes:
+      - /data/rabbitmq/data/:/var/lib/rabbitmq/
+#      - /data/rabbitmq/log/:/var/log/rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PWD}
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_UN}
+    networks:
+      - bank-app-network
+
+  postgresql:
+    image: postgres:15
+    restart: unless-stopped
+    env_file: ./.env
+    container_name: ${POSTGRES_CONTAINER_NAME}
+    ports:
+      - ${POSTGRES_LOCAL_PORT}:${POSTGRES_DOCKER_PORT}
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PWD}
+      POSTGRES_USER: ${POSTGRES_UN}
+      POSTGRES_DB: ${POSTGRES_DATABASE}
+      PGDATA: /data/postgres
+    volumes:
+      - /data:/var/lib/postgresql/data
+    networks:
+      - bank-app-network
+
+networks:
+  bank-app-network:
+    driver: bridge
