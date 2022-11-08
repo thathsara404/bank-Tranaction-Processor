@@ -3,6 +3,7 @@ package com.bank.transaction.service.processor;
 import com.bank.transaction.service.processor.consts.MessageRoutingConst;
 import com.bank.transaction.service.processor.entity.Account;
 import com.bank.transaction.service.processor.entity.Transaction;
+import com.bank.transaction.service.processor.enums.TransactionStatus;
 import com.bank.transaction.service.processor.specification.IAccountRepository;
 import com.bank.transaction.service.processor.specification.ITransactionProcessor;
 import com.bank.transaction.service.processor.specification.ITransactionRepository;
@@ -70,16 +71,19 @@ public class TransactionProcessorImpl implements ITransactionProcessor {
                             String message = new String(body, StandardCharsets.UTF_8);
 
                             UUID transactionUUID = UUID.fromString(message);
-                            Transaction transactionData = getTransaction(transactionUUID);
+                            Transaction transactionData = getTransaction(transactionUUID, transactionRepository);
                             if (transactionData.getAccount().getAccountBalance().compareTo(transactionData.getTransactionAmount()) > 0) {
 
                                 Account senderAccount = transactionData.getAccount();
                                 senderAccount.setAccountBalance(senderAccount.getAccountBalance().subtract(transactionData.getTransactionAmount()));
                                 accountRepository.save(senderAccount);
 
-                                Account receiverAccount = getAccount(transactionData.getBeneficiaryAccountNumber());
+                                Account receiverAccount = getAccount(transactionData.getBeneficiaryAccountNumber(), accountRepository);
                                 receiverAccount.setAccountBalance(receiverAccount.getAccountBalance().add(transactionData.getTransactionAmount()));
                                 accountRepository.save(receiverAccount);
+
+                                transactionData.setTransactionStatus(TransactionStatus.COMPLETED);
+                                updateTransaction(transactionData, transactionRepository);
 
                             }
                             System.out.println("Message: " + message + " Routing Key: " + routingKey);
@@ -91,14 +95,19 @@ public class TransactionProcessorImpl implements ITransactionProcessor {
         }
     }
 
-    private Transaction getTransaction ( UUID transactionId) {
+    private Transaction getTransaction ( UUID transactionId, final ITransactionRepository transactionRepository) {
         Transaction transaction = transactionRepository.getByTransactionNumber(transactionId);
         return transaction;
     }
 
-    private Account getAccount(UUID accountNumber) {
+    private Account getAccount(UUID accountNumber, final IAccountRepository accountRepository) {
         Account account = accountRepository.getByAccountNumber(accountNumber);
         return account;
+    }
+
+    private Transaction updateTransaction(final Transaction transaction, final ITransactionRepository transactionRepository) {
+        Transaction updatedTransaction = transactionRepository.save(transaction);
+        return updatedTransaction;
     }
 
 }
